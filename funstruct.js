@@ -15,7 +15,7 @@ import {
   fromBraces
   } from '@sweet-js/helpers' for syntax;
 
-syntax funstruct = function(ctx) {
+export default syntax funstruct = function(ctx) {
 
   var createFunction = function(result, fn, modName) {
     let funcBody = fn.reduce(evaluateFunctionDef, #``);
