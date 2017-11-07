@@ -3,11 +3,15 @@ import {
   isIdentifier,
   isNumericLiteral, 
   isStringLiteral,
+  isTemplate,
   isKeyword,
   isRegExp,
   isBraces,
   fromNumber,
-  fromStringLiteral
+  fromStringLiteral,
+  fromParens,
+  fromKeyword,
+  fromIdentifier
   } from '@sweet-js/helpers' for syntax;
 
 syntax fnModule = function(ctx) {
@@ -42,6 +46,7 @@ syntax fnModule = function(ctx) {
       let dummy = #`dummy`.get(0);
       let conditionTemplate = #`eval(${fromStringLiteral(dummy, conditionLiteral)})`; 
       let localVars =  [];
+      let _defaults = [];
       setLocalVariables(condition, undefined, localVars, {});
       let variableTemplate = #`eval(${fromStringLiteral(dummy, localVars.join(' '))})`; 
       return result.concat(#`
@@ -53,6 +58,7 @@ syntax fnModule = function(ctx) {
   }
 
   var getConditionalObject = function(params, path=[], conditional=[]) {
+    let lastDef;
     if (conditional instanceof Array) {
       let arity = 0;
       let isSpread = false;
@@ -63,6 +69,10 @@ syntax fnModule = function(ctx) {
           continue
         } else if (param.value && param.value.token && param.value.token.value === '...') {
           isSpread = true;
+          continue;
+        } else if (param.value && param.value.token && param.value.token.value === '=') {
+          let _default = getDefaultValue(paramsCtx);
+          lastDef._default = getDefaultString(_default);
           continue;
         } else  {
           let def = {};
@@ -113,15 +123,15 @@ syntax fnModule = function(ctx) {
               def.isSpread = isSpread;
               isSpread = false;
           }
+
+          lastDef = def;
           conditional.push(def);
         }
       } 
-      conditional.arity = arity;
     } else { 
       let isSpread = false;
       let hasAssertion = false;
       let paramsCtx = ctx.contextify(params);
-      let lastDef;
 
       for (let param of paramsCtx) { 
         if (param.value && param.value.token && param.value.token.value === ',') { 
@@ -132,7 +142,11 @@ syntax fnModule = function(ctx) {
         } else if (param.value && param.value.token && param.value.token.value === ':') {
           hasAssertion = true;
           continue;
-        } else  { 
+        } else if (param.value && param.value.token && param.value.token.value === '=') {
+          let _default = getDefaultValue(paramsCtx);
+          lastDef._default = getDefaultString(_default);
+          continue;
+        } else  {
           let def = {};
           if (param.value && param.value.token) {
             if (isIdentifier(param)) {
@@ -190,13 +204,53 @@ syntax fnModule = function(ctx) {
   }
 
 
-  var setLocalVariables = function(condition, rhs="Array.prototype.slice.call(arguments, 0)", args=[],  visited={}) {
+  var getDefaultValue = function(paramsCtx) {
+    let result = #``;
+    let marker;
+
+    for (let param of paramsCtx) { 
+      if (param.value && param.value.token && param.value.token.value === ',') { 
+        paramsCtx.reset(marker);
+        return result;
+      }
+      result = result.concat(param);
+      marker = paramsCtx.mark();
+    } 
+
+    return result;
+  }
+  var getDefaultString = function(_default) {
+    if (_default.inner) {
+      return getDefaultString(_default.inner);
+    }
+    let result = '';
+    _default.forEach((v) => {
+      result = result + ' ';
+      if (v.inner) {
+        result = result + getDefaultString(v) 
+      } else {
+        if (isStringLiteral(v)) {
+          result = result + "\"" + unwrap(v).value + "\"";
+        } else if (isTemplate(v)) {
+          result = result +  v.value.token.slice.text;
+        }else {
+          result = result + unwrap(v).value;
+        }
+      }
+    });
+
+    return result;
+  }
+
+
+
+  var setLocalVariables = function(condition, rhs="Array.prototype.slice.call(arguments, 0)", args=[], visited={}) {
+
+    let dummy = #`dummy`.get(0);
 
     if (condition.type === 'array') { 
       condition.value.forEach((v, i) => setLocalVariables(v, v.isSpread ? rhs + ".slice(" + v.arity + ")" : rhs + "[" + v.arity + "]", args, visited, true))
     } else if (condition.type === 'object') {
-      //sort objects on spreadability
-      //deassign properties if spread is true
       var sortedObjectsKeys = Object.keys(condition.value).sort(k => {
         return condition.value[k].isSpread ? 1 : -1;
       });
@@ -219,7 +273,11 @@ syntax fnModule = function(ctx) {
       visited[condition.value] = true;
       args.push("var " + condition.value + " = " + rhs + ";");
       if (condition.assertion) {
-        setLocalVariables(condition.assertion, rhs, args, visited, condition.assertion.type === 'array')
+        setLocalVariables(condition.assertion, rhs, args, visited)
+      }
+
+      if (condition._default) {
+        args.push('if(' + condition.value  + '===undefined){  ' + condition.value  + '=' + condition._default +';}; ')
       }
     }
   }
@@ -323,3 +381,16 @@ syntax fnModule = function(ctx) {
 
   return init.concat(result);
 }
+
+
+fnModule List {
+
+  sum({  x=function() {
+    return ` hi my "name ${argument[0] + ''} is jamie"`
+  }}) {
+    return this.sum(list, 0);
+  }
+}
+
+
+List.flatten([1,2,[3,[4,[5,6],[7],8,[9]],10,[[[11]]]]])
