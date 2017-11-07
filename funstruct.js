@@ -15,6 +15,8 @@ import {
   fromBraces
   } from '@sweet-js/helpers' for syntax;
 
+'lang sweet.js';
+
 export default syntax funstruct = function(ctx) {
 
   var createFunction = function(result, fn, modName) {
