@@ -15,7 +15,7 @@ import {
   fromBraces
   } from '@sweet-js/helpers' for syntax;
 
-export default syntax funstruct = function(ctx) {
+syntax funstruct = function(ctx) {
 
   var createFunction = function(result, fn, modName) {
     let funcBody = fn.reduce(evaluateFunctionDef, #``);
@@ -29,7 +29,6 @@ export default syntax funstruct = function(ctx) {
           break;
       }
     }`;
-
     return result.concat(def);
   }
 
@@ -43,7 +42,7 @@ export default syntax funstruct = function(ctx) {
         path: [],
         isSpread: conditional.isSpread,
         isEmpty: conditional.length === 0,
-      }
+      };
       let conditionLiteral = buildCondition(condition); 
       let dummy = #`dummy`.get(0);
       let conditionTemplate = #`eval(${fromStringLiteral(dummy, conditionLiteral)})`; 
@@ -55,13 +54,12 @@ export default syntax funstruct = function(ctx) {
                            case ${conditionTemplate}:
                              ${variableTemplate}
                              ${bodyTemplate}
-                           `)
+                           `);
   }
 
   var getBodyTemplate = function(body, when) {
     if (!when) {
-      return #`if(true) ${body}
-      `;
+      return #`if(true) ${body}`;
     }
     let whenCondition = getStringFromTemplate(when)
     let dummy = #`dummy`.get(0);
@@ -84,7 +82,7 @@ export default syntax funstruct = function(ctx) {
         if (param.value && param.value.token && param.value.token.value === ',') { 
           arity++;
           conditional.arity++;
-          continue
+          continue;
         } else if (param.value && param.value.token && param.value.token.value === '...') {
           isSpread = true;
           conditional.isSpread = isSpread;
@@ -158,7 +156,7 @@ export default syntax funstruct = function(ctx) {
 
       for (let param of paramsCtx) { 
         if (param.value && param.value.token && param.value.token.value === ',') { 
-          continue
+          continue;
         } else if (param.value && param.value.token && param.value.token.value === '...') {
           isSpread = true;
           continue;
@@ -207,7 +205,7 @@ export default syntax funstruct = function(ctx) {
               def.type = 'array';
               def.path = [...path, lastDef.value];
               def.value = getConditionalObject(param, [...path, lastDef.value], []);
-              def.isEmpty = def.value.length === 0
+              def.isEmpty = def.value.length === 0;
               def.isSpread = isSpread;
               isSpread = false;
           }
@@ -222,10 +220,8 @@ export default syntax funstruct = function(ctx) {
         }
       }
     }
-
-    return conditional
+    return conditional;
   }
-
 
   var getDefaultValue = function(paramsCtx) {
     let result = #``;
@@ -239,9 +235,9 @@ export default syntax funstruct = function(ctx) {
       result = result.concat(param);
       marker = paramsCtx.mark();
     } 
-
     return result;
   }
+
   var getStringFromTemplate = function(_default) {
     if (_default.inner) {
       return getStringFromTemplate(_default.inner);
@@ -250,7 +246,7 @@ export default syntax funstruct = function(ctx) {
     _default.forEach((v) => {
       result = result + ' ';
       if (v.inner) {
-        result = result + getStringFromTemplate(v) 
+        result = result + getStringFromTemplate(v);
       } else {
         if (isStringLiteral(v)) {
           result = result + "\"" + unwrap(v).value + "\"";
@@ -265,14 +261,12 @@ export default syntax funstruct = function(ctx) {
     return result;
   }
 
-
-
   var setLocalVariables = function(condition, rhs="Array.prototype.slice.call(arguments, 0)", args=[], visited={}) {
-
     let dummy = #`dummy`.get(0);
-
     if (condition.type === 'array') { 
-      condition.value.forEach((v, i) => setLocalVariables(v, v.isSpread ? rhs + ".slice(" + v.arity + ")" : rhs + "[" + v.arity + "]", args, visited, true))
+      condition.value.forEach((v, i) =>{
+        setLocalVariables(v, v.isSpread ? rhs + ".slice(" + v.arity + ")" : rhs + "[" + v.arity + "]", args, visited, true);
+      });
     } else if (condition.type === 'object') {
       var sortedObjectsKeys = Object.keys(condition.value).sort(k => {
         return condition.value[k].isSpread ? 1 : -1;
@@ -280,27 +274,28 @@ export default syntax funstruct = function(ctx) {
       sortedObjectsKeys.forEach((k, i) => {
         let object = condition.value[k];
         if (object.isSpread) {
-          setLocalVariables(condition.value[k], "Object.assign(" + rhs + ", {})", args, visited, false)
+          setLocalVariables(condition.value[k], "Object.assign(" + rhs + ", {})", args, visited);
           const deassignString = sortedObjectsKeys.slice(0, i).map(x => "delete " + k + "[\"" + x + "\"]; ").join(''); 
-          args.push(deassignString)
+          args.push(deassignString);
         } else {
-          setLocalVariables(condition.value[k], rhs + "[\"" + k + "\"]", args, visited, false)
+          setLocalVariables(condition.value[k], rhs + "[\"" + k + "\"]", args, visited);
         }
-      })
+      });
     } else if (condition.type === 'var') {
       if (visited[condition.value]) {
-        console.error("duplicate definitions for " + condition.value)
+        //TODO: make more descriptive
+        console.error("duplicate definitions for " + condition.value);
         process.exit();
       }
 
       visited[condition.value] = true;
       args.push("var " + condition.value + " = " + rhs + ";");
       if (condition.assertion) {
-        setLocalVariables(condition.assertion, rhs, args, visited)
+        setLocalVariables(condition.assertion, rhs, args, visited);
       }
 
       if (condition._default) {
-        args.push('if(' + condition.value  + '===undefined){  ' + condition.value  + '=' + condition._default +';}; ')
+        args.push('if(' + condition.value  + '===undefined){  ' + condition.value  + '=' + condition._default +';}; ');
       }
     }
   }
@@ -328,10 +323,10 @@ export default syntax funstruct = function(ctx) {
     if (condition.type === 'array') {
       result = result + " && " + def + " instanceof Array "; 
 
-      if (condition.value[condition.value.length - 1] && condition.value[condition.value.length - 1].isSpread) {
-        result = result + " && " + def + ".length >= " + (condition.value.length - 1 );
+      if (condition.value.isSpread) {
+        result = result + " && " + def + ".length >= " + Math.max(0, condition.value.arity - 2);
       } else {
-        result = result + " && " + def + ".length === " + condition.value.length;
+        result = result + " && " + def + ".length === " + (condition.value.arity - 1);
       }
       return result + condition.value.map(iterateCondition).join('');
     } else if (condition.type === 'object') {
@@ -374,7 +369,6 @@ export default syntax funstruct = function(ctx) {
         result = result + " && ";
       }
     }
-
     return result;
   }
 
@@ -392,8 +386,8 @@ export default syntax funstruct = function(ctx) {
     bodyCtx = ctx.contextify(ctx.next().value);
     init = #`var ${name} = {};`;
   }
+
   let fns = {};
-  
   for (let item of bodyCtx) { 
     if (fns[item.value] === undefined) {
       fns[item.value] = [];
