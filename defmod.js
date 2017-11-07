@@ -379,8 +379,19 @@ syntax fnModule = function(ctx) {
   }
 
   let name = ctx.next().value;
-  let bodyCtx = ctx.contextify(ctx.next().value);
-  let init = #`var ${name} = {};`;
+  let marker = ctx.mark();
+  let test = ctx.next().value;
+  let init;
+  let bodyCtx;
+  if (unwrap(test).value === 'extends') {
+    let extending = ctx.next().value; 
+    bodyCtx = ctx.contextify(ctx.next().value);
+    init = #`var ${name} = Object.assign({}, ${extending});`;
+  } else {
+    ctx.reset(marker);
+    bodyCtx = ctx.contextify(ctx.next().value);
+    init = #`var ${name} = {};`;
+  }
   let fns = {};
   
   for (let item of bodyCtx) { 
@@ -390,7 +401,7 @@ syntax fnModule = function(ctx) {
     }
 
     let params = bodyCtx.next().value;
-    let marker = bodyCtx.mark();
+    marker = bodyCtx.mark();
 
     let whenTest = bodyCtx.next().value; 
     if (unwrap(whenTest).value === 'when') {
@@ -426,4 +437,3 @@ fnModule Helper {
     return 1;
   }
 }
-
