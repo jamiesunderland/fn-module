@@ -117,8 +117,7 @@ syntax fnModule = function(ctx) {
         }
       } 
       conditional.arity = arity;
-    } else { // iterate over the object keys
-
+    } else { 
       let isSpread = false;
       let hasAssertion = false;
       let paramsCtx = ctx.contextify(params);
@@ -272,7 +271,6 @@ syntax fnModule = function(ctx) {
           return result + " && " + condition.value + ".test( " + def + " ) ";
         case 'var':
           if (typeof condition.path[condition.path.length - 1] === "string" && !condition.isSpread) {
-          console.log(condition)
             result = result + " && " + def + " !== undefined ";
           }
           if (condition.assertion) {
@@ -325,25 +323,3 @@ syntax fnModule = function(ctx) {
 
   return init.concat(result);
 }
-
-fnModule FunTest  {
-
-  keySort({
-    a,
-    ...b,
-    c
-  }) {
-    console.log(a, c, b)
-  }
-
-}
-
-var y = {
-  a: 5,
-  name : "janie",
-  age: 25,
-  c: "asdf"
-}
-
-
-FunTest.keySort(y);
