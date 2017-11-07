@@ -4,6 +4,7 @@ import {
   isNumericLiteral, 
   isStringLiteral,
   isKeyword,
+  isRegExp,
   isBraces,
   fromNumber,
   fromStringLiteral
@@ -19,7 +20,7 @@ syntax fnModule = function(ctx) {
       switch (true) {
         ${funcBody}
         default:
-          return new Error("no pattern matched for " + ${fromStringLiteral(dummy, functionNamespace)} + " with arity " + arguments.length)
+          return new Error("no definition found for " + ${fromStringLiteral(dummy, functionNamespace)} + " with arity " + arguments.length)
           break;
       }
     }`;
@@ -43,7 +44,6 @@ syntax fnModule = function(ctx) {
       let localVars =  [];
       setLocalVariables(condition, undefined, localVars, {});
       let variableTemplate = #`eval(${fromStringLiteral(dummy, localVars.join(' '))})`; 
-      // build argument list
       return result.concat(#`
                            case ${conditionTemplate}:
                              ${variableTemplate}
@@ -86,6 +86,11 @@ syntax fnModule = function(ctx) {
               def.value = unwrap(param).value;
             } else if (isKeyword(param))  {
               def.type = 'boolean';
+              def.path = [...path, arity];
+              def.arity = arity;
+              def.value = unwrap(param).value;
+            } else if (isRegExp(param))  {
+              def.type = 'regex';
               def.path = [...path, arity];
               def.arity = arity;
               def.value = unwrap(param).value;
@@ -149,6 +154,10 @@ syntax fnModule = function(ctx) {
               def.type = 'boolean';
               def.path = [...path, lastDef.value];
               def.value = unwrap(param).value;
+            } else if (isRegExp(param))  {
+              def.type = 'regex';
+              def.path = [...path, lastDef.value];
+              def.value = unwrap(param).value;
             }
 
           } else if (isBraces(param)) {
@@ -189,7 +198,19 @@ syntax fnModule = function(ctx) {
     } else if (condition.type === 'object') {
       //sort objects on spreadability
       //deassign properties if spread is true
-      Object.keys(condition.value).forEach((k) => setLocalVariables(condition.value[k], rhs + "[\"" + k + "\"]", args, visited, false))
+      var sortedObjectsKeys = Object.keys(condition.value).sort(k => {
+        return condition.value[k].isSpread ? 1 : -1;
+      });
+      sortedObjectsKeys.forEach((k, i) => {
+        let object = condition.value[k];
+        if (object.isSpread) {
+          setLocalVariables(condition.value[k], "Object.assign(" + rhs + ", {})", args, visited, false)
+          const deassignString = sortedObjectsKeys.slice(0, i).map(x => "delete " + k + "[\"" + x + "\"]; ").join(''); 
+          args.push(deassignString)
+        } else {
+          setLocalVariables(condition.value[k], rhs + "[\"" + k + "\"]", args, visited, false)
+        }
+      })
     } else if (condition.type === 'var') {
       if (visited[condition.value]) {
         console.error("duplicate definitions for " + condition.value)
@@ -247,8 +268,11 @@ syntax fnModule = function(ctx) {
         case 'number':
         case 'boolean':
           return result + " && " + def + " === " + condition.value + " ";
+        case 'regex':
+          return result + " && " + condition.value + ".test( " + def + " ) ";
         case 'var':
-          if (typeof condition.path[condition.path.length - 1] === "string") {
+          if (typeof condition.path[condition.path.length - 1] === "string" && !condition.isSpread) {
+          console.log(condition)
             result = result + " && " + def + " !== undefined ";
           }
           if (condition.assertion) {
@@ -302,22 +326,24 @@ syntax fnModule = function(ctx) {
   return init.concat(result);
 }
 
-fnModule List  {
+fnModule FunTest  {
 
-  map(arr, callback) {
-    return this.map(arr, callback, 0, [] );
-  }
-
-  map([], , ,retList) {
-    return retList;
-  }
-
-  map([head, ...tail], callback, index, retList) {
-    return this.map(tail, callback, index + 1, [...retList, callback(head, index)])
+  keySort({
+    a,
+    ...b,
+    c
+  }) {
+    console.log(a, c, b)
   }
 
 }
 
-List.map([1,2,3], (a) => {
-  return a * a;
-})
+var y = {
+  a: 5,
+  name : "janie",
+  age: 25,
+  c: "asdf"
+}
+
+
+FunTest.keySort(y);
