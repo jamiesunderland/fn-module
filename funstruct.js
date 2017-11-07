@@ -15,9 +15,8 @@ import {
   fromBraces
   } from '@sweet-js/helpers' for syntax;
 
-'lang sweet.js';
 
-export default syntax funstruct = function(ctx) {
+syntax funstruct = function(ctx) {
 
   var createFunction = function(result, fn, modName) {
     let funcBody = fn.reduce(evaluateFunctionDef, #``);
@@ -44,6 +43,8 @@ export default syntax funstruct = function(ctx) {
         isSpread: conditional.isSpread,
         isEmpty: conditional.length === 0,
       };
+
+      console.log(condition)
       let conditionLiteral = buildCondition(condition); 
       let dummy = #`dummy`.get(0);
       let conditionTemplate = #`eval(${fromStringLiteral(dummy, conditionLiteral)})`; 
@@ -74,13 +75,13 @@ export default syntax funstruct = function(ctx) {
   var getConditionalObject = function(params, path=[], conditional=[]) {
     let lastDef;
     if (conditional instanceof Array) {
-      let arity = 0;
-      conditional.arity = 1;
+      let index = 0;
+      conditional.arity = 0;
       let isSpread = false;
       let paramsCtx = ctx.contextify(params);
       for (let param of paramsCtx) {
         if (param.value && param.value.token && param.value.token.value === ',') { 
-          arity++;
+          index++;
           conditional.arity++;
           continue;
         } else if (param.value && param.value.token && param.value.token.value === '...') {
@@ -96,49 +97,49 @@ export default syntax funstruct = function(ctx) {
           if (param.value && param.value.token) {
             if (isIdentifier(param)) {
               def.type = 'var';
-              def.path = [...path, arity];
-              def.arity = arity;
+              def.path = [...path, index];
+              def.index = index;
               def.value = unwrap(param).value;
               def.isSpread = isSpread;
               isSpread = false;
             } else if (isNumericLiteral(param)) {
               def.type = 'number';
-              def.path = [...path, arity];
-              def.arity = arity;
+              def.path = [...path, index];
+              def.index = index;
               def.value = unwrap(param).value;
             } else if (isStringLiteral(param)) {
               def.type = 'string';
-              def.path = [...path, arity];
-              def.arity = arity;
+              def.path = [...path, index];
+              def.index = index;
               def.value = unwrap(param).value;
             } else if (isKeyword(param))  {
               def.type = 'boolean';
-              def.path = [...path, arity];
-              def.arity = arity;
+              def.path = [...path, index];
+              def.index = index;
               def.value = unwrap(param).value;
             } else if (isRegExp(param))  {
               def.type = 'regex';
-              def.path = [...path, arity];
-              def.arity = arity;
+              def.path = [...path, index];
+              def.index = index;
               def.value = unwrap(param).value;
             }
-            if (conditional.arity === 1) {
-              conditional.arity++;
+            if (conditional.arity === 0) {
+              conditional.arity = 1;
             }
 
           } else if (isBraces(param)) {
               def.type = 'object';
-              def.path = [...path, arity];
-              def.arity = arity;
-              def.value = getConditionalObject(param, [...path, arity], {});
+              def.path = [...path, index];
+              def.index = index;
+              def.value = getConditionalObject(param, [...path, index], {});
               def.isEmpty = def.value.length === 0
               def.isSpread = isSpread;
               isSpread = false;
           } else {
               def.type = 'array';
-              def.path = [...path, arity];
-              def.arity = arity;
-              def.value = getConditionalObject(param, [...path, arity], []);
+              def.path = [...path, index];
+              def.index = index;
+              def.value = getConditionalObject(param, [...path, index], []);
               def.isEmpty = def.value.length === 0
               def.isSpread = isSpread;
               isSpread = false;
@@ -258,7 +259,7 @@ export default syntax funstruct = function(ctx) {
     let dummy = #`dummy`.get(0);
     if (condition.type === 'array') { 
       condition.value.forEach((v, i) =>{
-        setLocalVariables(v, v.isSpread ? rhs + ".slice(" + v.arity + ")" : rhs + "[" + v.arity + "]", args, visited, true);
+        setLocalVariables(v, v.isSpread ? rhs + ".slice(" + v.index + ")" : rhs + "[" + v.index + "]", args, visited, true);
       });
     } else if (condition.type === 'object') {
       var sortedObjectsKeys = Object.keys(condition.value).sort(k => {
@@ -294,9 +295,9 @@ export default syntax funstruct = function(ctx) {
   var buildCondition = function(condition) {
     let result = '';
     if (condition.isSpread) {
-      return "arguments.length >= " + Math.max(0, condition.arity - 2) + " " + iterateCondition(condition);
+      return "arguments.length >= " + Math.max(0, condition.arity - 1) + " " + iterateCondition(condition);
     } else {
-      return "arguments.length === " + (condition.arity - 1) + " " + iterateCondition(condition);
+      return "arguments.length === " + (condition.arity) + " " + iterateCondition(condition);
     }
   }
 
@@ -315,9 +316,9 @@ export default syntax funstruct = function(ctx) {
       result = result + " && " + def + " instanceof Array "; 
 
       if (condition.value.isSpread) {
-        result = result + " && " + def + ".length >= " + Math.max(0, condition.value.arity - 2);
+        result = result + " && " + def + ".length >= " + Math.max(0, condition.value.arity - 1);
       } else {
-        result = result + " && " + def + ".length === " + (condition.value.arity - 1);
+        result = result + " && " + def + ".length === " + condition.value.arity;
       }
       return result + condition.value.map(iterateCondition).join('');
     } else if (condition.type === 'object') {
