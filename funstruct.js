@@ -33,7 +33,6 @@ export default syntax funstruct = function(ctx) {
   }
 
   var evaluateFunctionDef = function(result, {body, params, when}) {
-
       let conditional = getConditionalObject(params, [], []); 
       const condition = {
         arity: conditional.arity,
@@ -69,7 +68,6 @@ export default syntax funstruct = function(ctx) {
         break;
       }`;
   }
-
 
   var getConditionalObject = function(params, path=[], conditional=[]) {
     let lastDef;
@@ -122,7 +120,6 @@ export default syntax funstruct = function(ctx) {
               def.arity = arity;
               def.value = unwrap(param).value;
             }
-
             if (conditional.arity === 1) {
               conditional.arity++;
             }
@@ -144,7 +141,6 @@ export default syntax funstruct = function(ctx) {
               def.isSpread = isSpread;
               isSpread = false;
           }
-
           lastDef = def;
           conditional.push(def);
         }
@@ -153,7 +149,6 @@ export default syntax funstruct = function(ctx) {
       let isSpread = false;
       let hasAssertion = false;
       let paramsCtx = ctx.contextify(params);
-
       for (let param of paramsCtx) { 
         if (param.value && param.value.token && param.value.token.value === ',') { 
           continue;
@@ -193,7 +188,6 @@ export default syntax funstruct = function(ctx) {
               def.path = [...path, lastDef.value];
               def.value = unwrap(param).value;
             }
-
           } else if (isBraces(param)) {
               def.type = 'object';
               def.path = [...path, lastDef.value];
@@ -209,7 +203,6 @@ export default syntax funstruct = function(ctx) {
               def.isSpread = isSpread;
               isSpread = false;
           }
-
           if (hasAssertion) {
             lastDef.assertion = def;
             hasAssertion = false;
@@ -226,7 +219,6 @@ export default syntax funstruct = function(ctx) {
   var getDefaultValue = function(paramsCtx) {
     let result = #``;
     let marker;
-
     for (let param of paramsCtx) { 
       if (param.value && param.value.token && param.value.token.value === ',') { 
         paramsCtx.reset(marker);
@@ -257,7 +249,6 @@ export default syntax funstruct = function(ctx) {
         }
       }
     });
-
     return result;
   }
 
@@ -287,13 +278,11 @@ export default syntax funstruct = function(ctx) {
         console.error("duplicate definitions for " + condition.value);
         process.exit();
       }
-
       visited[condition.value] = true;
       args.push("var " + condition.value + " = " + rhs + ";");
       if (condition.assertion) {
         setLocalVariables(condition.assertion, rhs, args, visited);
       }
-
       if (condition._default) {
         args.push('if(' + condition.value  + '===undefined){  ' + condition.value  + '=' + condition._default +';}; ');
       }
@@ -386,17 +375,14 @@ export default syntax funstruct = function(ctx) {
     bodyCtx = ctx.contextify(ctx.next().value);
     init = #`var ${name} = {};`;
   }
-
   let fns = {};
   for (let item of bodyCtx) { 
     if (fns[item.value] === undefined) {
       fns[item.value] = [];
       fns[item.value].name = item.value;
     }
-
     let params = bodyCtx.next().value;
     marker = bodyCtx.mark();
-
     let whenTest = bodyCtx.next().value; 
     if (unwrap(whenTest).value === 'when') {
       let when = bodyCtx.next().value; 
@@ -415,10 +401,8 @@ export default syntax funstruct = function(ctx) {
       });
     }
   }
-
   var result = Object
   .keys(fns)
   .reduce( (result, key) => createFunction( result, fns[key], name), #``);
-
   return init.concat(result);
 }
