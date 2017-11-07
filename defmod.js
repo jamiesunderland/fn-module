@@ -15,7 +15,7 @@ import {
   fromBraces
   } from '@sweet-js/helpers' for syntax;
 
-syntax fnModule = function(ctx) {
+syntax funstruct = function(ctx) {
 
   var createFunction = function(result, fn, modName) {
     let funcBody = fn.reduce(evaluateFunctionDef, #``);
@@ -422,18 +422,9 @@ syntax fnModule = function(ctx) {
     }
   }
 
-
   var result = Object
   .keys(fns)
   .reduce( (result, key) => createFunction( result, fns[key], name), #``);
 
   return init.concat(result);
-}
-
-
-fnModule Helper {
-
-  f(a,2, ...c) when (n <= 1)  {
-    return 1;
-  }
 }
