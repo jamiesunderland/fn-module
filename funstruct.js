@@ -123,9 +123,6 @@ export syntax funstruct = function(ctx) {
               def.index = index;
               def.value = unwrap(param).value;
             }
-            if (conditional.arity === 0) {
-              conditional.arity = 1;
-            }
 
           } else if (isBraces(param)) {
               def.type = 'object';
@@ -143,6 +140,10 @@ export syntax funstruct = function(ctx) {
               def.isEmpty = def.value.length === 0
               def.isSpread = isSpread;
               isSpread = false;
+          }
+
+          if (conditional.arity === 0) {
+            conditional.arity = 1;
           }
           lastDef = def;
           conditional.push(def);
