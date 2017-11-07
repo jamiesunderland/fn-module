@@ -16,7 +16,9 @@ import {
   } from '@sweet-js/helpers' for syntax;
 
 
-syntax funstruct = function(ctx) {
+'lang sweet.js';
+
+export syntax funstruct = function(ctx) {
 
   var createFunction = function(result, fn, modName) {
     let funcBody = fn.reduce(evaluateFunctionDef, #``);
@@ -43,8 +45,6 @@ syntax funstruct = function(ctx) {
         isSpread: conditional.isSpread,
         isEmpty: conditional.length === 0,
       };
-
-      console.log(condition)
       let conditionLiteral = buildCondition(condition); 
       let dummy = #`dummy`.get(0);
       let conditionTemplate = #`eval(${fromStringLiteral(dummy, conditionLiteral)})`; 
