@@ -11,14 +11,15 @@ import {
   fromStringLiteral,
   fromParens,
   fromKeyword,
-  fromIdentifier
+  fromIdentifier,
+  fromBraces
   } from '@sweet-js/helpers' for syntax;
 
 syntax fnModule = function(ctx) {
 
   var createFunction = function(result, fn, modName) {
     let funcBody = fn.reduce(evaluateFunctionDef, #``);
-    let functionNamespace = modName.value + "." + fn.name
+    let functionNamespace = modName.value + "." + fn.name;
     let dummy = #`dummy`.get(0);
     let def = #`${modName}.${fn.name} = function() {
       switch (true) {
@@ -36,10 +37,11 @@ syntax fnModule = function(ctx) {
 
       let conditional = getConditionalObject(params, [], []); 
       const condition = {
-        arity: conditional[conditional.length - 1] !== undefined ? conditional[conditional.length - 1].arity : 0,
+        arity: conditional.arity,
         type: 'array',
         value: conditional,
         path: [],
+        isSpread: conditional.isSpread,
         isEmpty: conditional.length === 0,
       }
       let conditionLiteral = buildCondition(condition); 
@@ -48,14 +50,26 @@ syntax fnModule = function(ctx) {
       let localVars =  [];
       setLocalVariables(condition, undefined, localVars, {});
       let variableTemplate = #`eval(${fromStringLiteral(dummy, localVars.join(' '))})`; 
-      let whenTemplate = getWhenTemplate(when);
+      let bodyTemplate = getBodyTemplate(body, when);
       return result.concat(#`
                            case ${conditionTemplate}:
                              ${variableTemplate}
-                             ${whenTemplate}
-                             ${body}
-                             break;
+                             ${bodyTemplate}
                            `)
+  }
+
+  var getBodyTemplate = function(body, when) {
+    if (!when) {
+      return #`if(true) ${body}
+      `;
+    }
+    let whenCondition = getStringFromTemplate(when)
+    let dummy = #`dummy`.get(0);
+    return #`
+      if(eval(${fromStringLiteral(dummy, whenCondition)})) {
+        if(true)${body}
+        break;
+      }`;
   }
 
 
@@ -63,14 +77,17 @@ syntax fnModule = function(ctx) {
     let lastDef;
     if (conditional instanceof Array) {
       let arity = 0;
+      conditional.arity = 1;
       let isSpread = false;
       let paramsCtx = ctx.contextify(params);
       for (let param of paramsCtx) {
         if (param.value && param.value.token && param.value.token.value === ',') { 
           arity++;
+          conditional.arity++;
           continue
         } else if (param.value && param.value.token && param.value.token.value === '...') {
           isSpread = true;
+          conditional.isSpread = isSpread;
           continue;
         } else if (param.value && param.value.token && param.value.token.value === '=') {
           let _default = getDefaultValue(paramsCtx);
@@ -106,6 +123,10 @@ syntax fnModule = function(ctx) {
               def.path = [...path, arity];
               def.arity = arity;
               def.value = unwrap(param).value;
+            }
+
+            if (conditional.arity === 1) {
+              conditional.arity++;
             }
 
           } else if (isBraces(param)) {
@@ -286,11 +307,10 @@ syntax fnModule = function(ctx) {
 
   var buildCondition = function(condition) {
     let result = '';
-    if (condition.value[condition.value.length - 1] && condition.value[condition.value.length - 1].isSpread) {
-      return "arguments.length >= " + (condition.arity - 1) + " " + iterateCondition(condition);
+    if (condition.isSpread) {
+      return "arguments.length >= " + Math.max(0, condition.arity - 2) + " " + iterateCondition(condition);
     } else {
-      const arity = Math.max(condition.arity === undefined ? 0 : condition.arity + 1,  condition.value.length);
-      return "arguments.length === " + arity + " " + iterateCondition(condition);
+      return "arguments.length === " + (condition.arity - 1) + " " + iterateCondition(condition);
     }
   }
 
@@ -358,16 +378,6 @@ syntax fnModule = function(ctx) {
     return result;
   }
 
-  var getWhenTemplate = function(when) {
-    if (!when) {
-      return #``;
-    }
-    let whenCondition = getStringFromTemplate(when)
-    let dummy = #`dummy`.get(0);
-    let result = 'eval ( if (!' + whenCondition + ') { continue; })'; 
-    return fromStringLiteral(dummy, result);
-  }
-
   let name = ctx.next().value;
   let bodyCtx = ctx.contextify(ctx.next().value);
   let init = #`var ${name} = {};`;
@@ -412,21 +422,8 @@ syntax fnModule = function(ctx) {
 
 fnModule Helper {
 
-  f(n,) when (n <= 1)  {
+  f(a,2, ...c) when (n <= 1)  {
     return 1;
   }
-
-  f(n, memo) when (memo[n] !== undefined) {
-    return memo[n];
-  }
-
-  // f(n, memo) {
-  //   memo[n] = this.f(n - 1, memo) + this.f(n - 2, memo);
-  //   return memo[n];
-  // }
-
-  // f(n) {
-  //   return this.f(n, {});
-  // }
 }
 
