@@ -32,7 +32,7 @@ syntax fnModule = function(ctx) {
     return result.concat(def);
   }
 
-  var evaluateFunctionDef = function(result, {body, params}) {
+  var evaluateFunctionDef = function(result, {body, params, when}) {
 
       let conditional = getConditionalObject(params, [], []); 
       const condition = {
@@ -46,16 +46,18 @@ syntax fnModule = function(ctx) {
       let dummy = #`dummy`.get(0);
       let conditionTemplate = #`eval(${fromStringLiteral(dummy, conditionLiteral)})`; 
       let localVars =  [];
-      let _defaults = [];
       setLocalVariables(condition, undefined, localVars, {});
       let variableTemplate = #`eval(${fromStringLiteral(dummy, localVars.join(' '))})`; 
+      let whenTemplate = getWhenTemplate(when);
       return result.concat(#`
                            case ${conditionTemplate}:
                              ${variableTemplate}
+                             ${whenTemplate}
                              ${body}
                              break;
                            `)
   }
+
 
   var getConditionalObject = function(params, path=[], conditional=[]) {
     let lastDef;
@@ -72,7 +74,7 @@ syntax fnModule = function(ctx) {
           continue;
         } else if (param.value && param.value.token && param.value.token.value === '=') {
           let _default = getDefaultValue(paramsCtx);
-          lastDef._default = getDefaultString(_default);
+          lastDef._default = getStringFromTemplate(_default);
           continue;
         } else  {
           let def = {};
@@ -144,7 +146,7 @@ syntax fnModule = function(ctx) {
           continue;
         } else if (param.value && param.value.token && param.value.token.value === '=') {
           let _default = getDefaultValue(paramsCtx);
-          lastDef._default = getDefaultString(_default);
+          lastDef._default = getStringFromTemplate(_default);
           continue;
         } else  {
           let def = {};
@@ -219,15 +221,15 @@ syntax fnModule = function(ctx) {
 
     return result;
   }
-  var getDefaultString = function(_default) {
+  var getStringFromTemplate = function(_default) {
     if (_default.inner) {
-      return getDefaultString(_default.inner);
+      return getStringFromTemplate(_default.inner);
     }
     let result = '';
     _default.forEach((v) => {
       result = result + ' ';
       if (v.inner) {
-        result = result + getDefaultString(v) 
+        result = result + getStringFromTemplate(v) 
       } else {
         if (isStringLiteral(v)) {
           result = result + "\"" + unwrap(v).value + "\"";
@@ -328,7 +330,7 @@ syntax fnModule = function(ctx) {
         case 'regex':
           return result + " && " + condition.value + ".test( " + def + " ) ";
         case 'var':
-          if (typeof condition.path[condition.path.length - 1] === "string" && !condition.isSpread) {
+          if (typeof condition.path[condition.path.length - 1] === "string" && !condition.isSpread && !condition._default) {
             result = result + " && " + def + " !== undefined ";
           }
           if (condition.assertion) {
@@ -356,6 +358,16 @@ syntax fnModule = function(ctx) {
     return result;
   }
 
+  var getWhenTemplate = function(when) {
+    if (!when) {
+      return #``;
+    }
+    let whenCondition = getStringFromTemplate(when)
+    let dummy = #`dummy`.get(0);
+    let result = 'eval ( if (!' + whenCondition + ') { continue; })'; 
+    return fromStringLiteral(dummy, result);
+  }
+
   let name = ctx.next().value;
   let bodyCtx = ctx.contextify(ctx.next().value);
   let init = #`var ${name} = {};`;
@@ -368,12 +380,27 @@ syntax fnModule = function(ctx) {
     }
 
     let params = bodyCtx.next().value;
-    let body = bodyCtx.next().value;
-    fns[item.value].push({
-      params,
-      body
-    });
+    let marker = bodyCtx.mark();
+
+    let whenTest = bodyCtx.next().value; 
+    if (unwrap(whenTest).value === 'when') {
+      let when = bodyCtx.next().value; 
+      let body = bodyCtx.next().value;
+      fns[item.value].push({
+        params,
+        body,
+        when
+      });
+    } else {
+      bodyCtx.reset(marker);
+      let body = bodyCtx.next().value;
+      fns[item.value].push({
+        params,
+        body
+      });
+    }
   }
+
 
   var result = Object
   .keys(fns)
@@ -383,14 +410,23 @@ syntax fnModule = function(ctx) {
 }
 
 
-fnModule List {
+fnModule Helper {
 
-  sum({  x=function() {
-    return ` hi my "name ${argument[0] + ''} is jamie"`
-  }}) {
-    return this.sum(list, 0);
+  f(n,) when (n <= 1)  {
+    return 1;
   }
+
+  f(n, memo) when (memo[n] !== undefined) {
+    return memo[n];
+  }
+
+  // f(n, memo) {
+  //   memo[n] = this.f(n - 1, memo) + this.f(n - 2, memo);
+  //   return memo[n];
+  // }
+
+  // f(n) {
+  //   return this.f(n, {});
+  // }
 }
 
-
-List.flatten([1,2,[3,[4,[5,6],[7],8,[9]],10,[[[11]]]]])
