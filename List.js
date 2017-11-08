@@ -33,4 +33,12 @@ funstruct List {
   flatten([ head, ...tail ], newList) {
     return this.flatten(tail, [...newList, head])
   }
+
+  someFunction(n) when (n > 5) {
+    return "n is greater than 5";
+  }
+
+  someFunction(n) {
+    return "n is smaller than or equal to 5";
+  }
 }
