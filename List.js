@@ -1,6 +1,6 @@
-import { funstruct } from './funstruct.js'
+import { funstruct } from './funstruct.sjs'
 
-funstruct List {
+export default funstruct List {
 
   sum(list) {
     return this.sum(list, 0);
